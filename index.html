@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Maccabee Catch!</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#1b1f5e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Maccabee">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #1b1f5e;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas#game {
+    display: block; width: 100vw; height: 100vh; height: 100dvh;
+    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: clamp(10px, 4vh, 48px) 14px 0;
+    pointer-events: none;
+    font-family: Fredoka, system-ui, sans-serif;
+  }
+  .overlay.hidden { display: none; }
+  .card {
+    pointer-events: auto;
+    background: rgba(255, 255, 255, 0.95);
+    border: 4px solid #2a1c4a; border-radius: 28px;
+    padding: 16px 20px 20px;
+    width: 100%; max-width: 440px; box-sizing: border-box;
+    max-height: calc(100dvh - 24px); overflow-y: auto;
+    text-align: center; color: #2a1c4a;
+    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.3);
+  }
+  h1 {
+    margin: 0 0 4px; line-height: 1.05;
+    font-size: clamp(32px, 8.5vw, 52px); font-weight: 700;
+    color: #ffb02e; text-shadow: 3px 3px 0 #2a1c4a;
+  }
+  .big { font-size: clamp(18px, 4.6vw, 24px); margin: 6px 0 10px; font-weight: 500; }
+  .story {
+    font-size: clamp(17px, 4.4vw, 22px); font-weight: 500; line-height: 1.3;
+    background: #eef1ff; border-radius: 16px; padding: 10px 14px; margin: 8px 0 12px;
+  }
+  .rows { display: grid; gap: 7px; margin-bottom: 10px; }
+  .row {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border-radius: 16px; padding: 6px 10px; font-size: 17px; font-weight: 700;
+  }
+  .row .icons { display: flex; gap: 6px; align-items: center; justify-content: center; }
+  .row .icons canvas { width: 34px; height: 34px; display: block; }
+  .row.good { background: #e3f7d6; color: #2e7a1a; }
+  .row.bad  { background: #ffe0e0; color: #b3261e; }
+  .row.gold { background: #fff3c4; color: #9a6200; }
+  .how { margin: 0 0 12px; font-size: 16px; font-weight: 500; opacity: 0.85; }
+  .score-line { font-size: clamp(20px, 5.2vw, 28px); margin: 4px 0 6px; font-weight: 500; }
+  .score-line b { font-size: 1.4em; color: #ff7a29; }
+  .best { font-size: 18px; margin: 0 0 14px; font-weight: 500; }
+  .record { color: #e0247a; font-weight: 700; }
+  .heb { font-size: 1.15em; font-weight: 700; }
+  button.go {
+    font-family: Fredoka, system-ui, sans-serif; font-weight: 700;
+    font-size: 28px; color: #2a1c4a; cursor: pointer;
+    background: #ffcf40; border: 4px solid #2a1c4a; border-radius: 999px;
+    padding: 9px 40px; box-shadow: 0 6px 0 #2a1c4a;
+    transition: transform 0.06s, box-shadow 0.06s;
+  }
+  button.go:active { transform: translateY(4px); box-shadow: 0 2px 0 #2a1c4a; }
+  button.go.alt { background: #fff; font-size: 19px; padding: 7px 22px; margin-top: 12px; box-shadow: 0 4px 0 #2a1c4a; }
+  button.go.hidden { display: none; }
+  .extras { display: flex; flex-wrap: wrap; gap: 0 10px; justify-content: center; }
+  #mute, #pauseBtn {
+    position: fixed; top: 12px; right: 12px; z-index: 5;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9); border: 3px solid #2a1c4a;
+    font-size: 24px; line-height: 1; cursor: pointer; padding: 0;
+  }
+  #pauseBtn { right: 74px; }
+  #pauseBtn.hidden { display: none; }
+  #pauseScreen { pointer-events: auto; background: rgba(20, 14, 50, 0.45); padding-top: 76px; }
+  #resumeBtn { padding: 10px 28px; white-space: nowrap; }
+  @media (min-width: 640px) and (min-height: 521px) {
+    .card { max-width: 600px; }
+    #startScreen .rows { grid-template-columns: 1fr 1fr 1fr; }
+    .row { font-size: 15px; }
+  }
+  @media (max-height: 560px) {
+    .overlay { padding-top: 8px; }
+    .card { padding: 10px 16px 14px; max-width: 560px; }
+    h1 { font-size: 30px; }
+    .big { margin: 2px 0 6px; font-size: 17px; }
+    #startScreen .rows { grid-template-columns: 1fr 1fr 1fr; margin-bottom: 8px; }
+    .row { font-size: 13px; padding: 5px 6px; }
+    .row .icons canvas { width: 26px; height: 26px; }
+    .how { display: none; }
+    .story { font-size: 16px; padding: 8px 12px; margin: 6px 0 8px; }
+    .best { margin-bottom: 8px; }
+    button.go { font-size: 22px; padding: 6px 30px; }
+    button.go.alt { font-size: 16px; margin-top: 8px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<button id="mute" aria-label="Sound on or off">🔊</button>
+<button id="pauseBtn" class="hidden" aria-label="Pause">⏸️</button>
+
+<div id="startScreen" class="overlay">
+  <div class="card">
+    <h1>Maccabee Catch!</h1>
+    <p class="big">Light the chanukiah, one night at a time!</p>
+    <div class="rows">
+      <div class="row good"><span class="icons" id="goodList"></span><span>Catch these! 🔥 lights a candle</span></div>
+      <div class="row bad"><span class="icons" id="badList"></span><span>Dodge these!</span></div>
+      <div class="row gold"><span class="icons" id="specialList"></span><span>Surprises! Spin the dreidel</span></div>
+    </div>
+    <p class="how">Don't let the oil run out!<br>Move with your finger, the mouse or the arrow keys</p>
+    <button class="go" id="playBtn">Play!</button>
+    <div class="extras">
+      <button class="go alt hidden" id="fromStartBtn">Start from night 1</button>
+      <button class="go alt hidden" id="endlessBtn">Endless night</button>
+      <button class="go alt" id="easyBtn">Easy mode: off</button>
+    </div>
+  </div>
+</div>
+
+<div id="pauseScreen" class="overlay hidden">
+  <div class="card">
+    <h1>Paused</h1>
+    <p class="big"><span class="hname"></span> will wait for you!</p>
+    <button class="go" id="resumeBtn">Keep playing!</button><br>
+    <button class="go alt" id="quitBtn">Back to the start</button>
+  </div>
+</div>
+
+<div id="nightScreen" class="overlay hidden">
+  <div class="card">
+    <h1 id="nightTitle">Night 1 is lit!</h1>
+    <p class="story" id="nightStory"></p>
+    <p class="score-line">Gelt so far: <b id="nightScore">0</b></p>
+    <button class="go" id="nextBtn">Next night</button>
+  </div>
+</div>
+
+<div id="winScreen" class="overlay hidden">
+  <div class="card">
+    <h1>Chanukah sameach!</h1>
+    <p class="story" id="winStory"></p>
+    <p class="big"><span class="heb" lang="he" dir="rtl">נס גדול היה שם</span><br>A great miracle happened there!</p>
+    <p class="score-line">You collected <b id="winScore">0</b> gelt!</p>
+    <p class="best" id="winBest"></p>
+    <button class="go" id="winEndlessBtn">Endless night</button><br>
+    <button class="go alt" id="winAgainBtn">Play all 8 nights again</button>
+  </div>
+</div>
+
+<div id="overScreen" class="overlay hidden">
+  <div class="card">
+    <h1 id="overTitle">Oh no!</h1>
+    <p class="big" id="overReason"></p>
+    <p class="score-line">You collected <b id="finalScore">0</b> gelt!</p>
+    <p class="best" id="bestLine"></p>
+    <button class="go" id="againBtn">Try again!</button><br>
+    <button class="go alt" id="overHomeBtn">Back to the start</button>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+//  EASY THINGS TO CHANGE
+// =====================================================================
+const CONFIG = {
+  heroName: 'Yehuda',
+  tunicColour: '#2f6fe0',                   // try '#d9342b' (red) or '#8e5cf7' (purple)
+  goodies: ['🍩', '🪙', '🥞', '🫒'],        // doughnuts, gelt, latkes, olives: 1 point each
+  jarPoints: 2,          // a sealed oil jar: 2 points and lots of oil
+  flameEvery: 10,        // every 10 points a 🔥 falls. Catch it to light a candle!
+  lives: 3,              // how many arrows before it's game over
+  startSpeed: 0.32,      // how fast things fall on night 1 (bigger = faster)
+  speedPerNight: 0.045,  // how much faster each night gets
+  oilDrains: true,       // the oil runs down over time, so keep catching!
+  burntPenalty: 3,       // burnt latke: lose 3 points
+  crackedPenalty: 5,     // cracked jar: lose 5 points and spill some oil
+  dreidel: { gimmel: 10, hei: 5, nun: 0, shin: -3 },   // what each dreidel letter is worth
+  goldenPoints: 10,      // the rare golden jug: 10 points, full oil and an extra heart
+  comboEvery: 5,         // 5 good catches in a row...
+  comboBonus: 2,         // ...is worth 2 bonus points
+  easyLives: 5,          // easy mode: more hearts,
+  easySpeed: 0.75,       //            slower falling,
+  easyDrain: 0.5,        //            and the oil lasts longer
+  // which night each new thing first shows up on
+  startsOnNight: { golden: 2, burnt: 2, dreidel: 3, shamash: 3, arrow: 4, hammer: 4, wind: 5, water: 6, cracked: 7 },
+  // how often things fall (0.1 means about 1 in 10)
+  chance: { golden: 0.012, shamash: 0.02, hammer: 0.03, dreidel: 0.08, water: 0.08, arrow: 0.12, burnt: 0.15, cracked: 0.1 },
+  unlockAll: false,      // true lets you pick any night straight away (for testing)
+};
+
+// One for each night: what's new, and the next line of the story.
+const NIGHTS = [
+  { news: 'Catch the doughnuts and gelt!',
+    story: 'Long ago, King Antiochus told the Jewish people they were not allowed to keep the Torah any more.' },
+  { news: 'Watch out for burnt latkes!',
+    story: "In the town of Modi'in, Mattityahu and his five sons stood up and said: we will keep the Torah!" },
+  { news: 'Catch a dreidel for a spin!',
+    story: 'His son Yehuda led the Maccabees, a small band of fighters facing a huge army.' },
+  { news: 'Dodge the arrows!',
+    story: 'They hid in the hills of Yehuda and won battle after battle, even though they were so few.' },
+  { news: "It's getting windy!",
+    story: 'The Greek army even brought war elephants, but the Maccabees did not give up.' },
+  { news: 'Water puts your candles out!',
+    story: 'At last they reached Yerushalayim and the Beit HaMikdash.' },
+  { news: 'Careful: some jars are cracked!',
+    story: 'They cleaned the Beit HaMikdash and searched everywhere for pure oil to light the Menorah.' },
+  { news: 'Everything at once. Find the golden jug!',
+    story: 'They found one small sealed jar, enough oil for just one day. It burned for eight days!' },
+];
+// =====================================================================
+
+const cvs = document.getElementById('game');
+const ctx = cvs.getContext('2d');
+const FONT = 'Fredoka, system-ui, sans-serif';
+const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+const DREIDEL_LETTERS = { gimmel: 'ג', hei: 'ה', nun: 'נ', shin: 'ש' };
+const BAD_KINDS = ['burnt', 'arrow', 'water', 'cracked'];
+const SKIES = [['#1a1f66', '#5a4aa6'], ['#161b5c', '#4d4aa8'], ['#1d1a5e', '#6a47a0'], ['#131a52', '#3f4f9e'],
+               ['#201a56', '#70469a'], ['#101848', '#3a55a0'], ['#1c1650', '#62409a'], ['#0f1440', '#4a3fa0']];
+
+let W = 0, H = 0, groundTop = 0, baseR = 50, itemSize = 44;
+let state = 'start';       // start | playing | finale | paused | ending | nightwon | card | over
+let resumeState = 'playing';
+let night = 1, endless = false, score = 0, nightStartScore = 0, lives = CONFIG.lives, level = 0;
+let lit = 0, pendingFlames = 0, flamePts = 0, combo = 0, wonGame = false;
+let items = [], particles = [], floaters = [], stars = [];
+let spawnT = 0, spawned = 0, endT = 0, bannerT = 0, bannerTitle = '', bannerSub = '', time = 0, fireT = 0;
+let oil = 1, oilWarned = false, overReason = 'arrow';
+let pointerDown = false, pointerX = null, pointerY = null;
+const keys = {};
+
+const m = { x: 0, targetX: 0, r: 50, mouth: 0, blink: 0, blinkT: 2.5, happy: 0, hurt: 0, lookX: 0, lookY: 0 };
+
+// ---------- storage (progress, best score, sound) ----------
+function load(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch (e) { return fallback; } }
+function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+let best = load('mc.best', 0);
+let progress = clamp(Number(load('mc.night', 1)) || 1, 1, 9);   // the next night to play; 9 means all eight are done
+let muted = load('mc.muted', false);
+let easy = load('mc.easy', false);
+
+// ---------- sound ----------
+let ac = null;
+function initAudio() {
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+  if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
+}
+function tone(freq, endFreq, dur, type, vol, delay) {
+  if (!ac || muted) return;
+  const t0 = ac.currentTime + (delay || 0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(freq, t0);
+  if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t0 + dur);
+  g.gain.setValueAtTime(vol || 0.12, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+const seq = (notes, dur, gap, type, vol) => notes.forEach((f, i) => tone(f, null, dur, type || 'triangle', vol || 0.13, i * gap));
+const sfx = {
+  catch()  { tone(520, 780, 0.07, 'triangle', 0.13); tone(780, 1040, 0.06, 'triangle', 0.1, 0.06); },
+  jar()    { tone(330, 660, 0.12, 'triangle', 0.14); tone(660, 880, 0.1, 'triangle', 0.1, 0.1); },
+  light()  { seq([659, 784, 988, 1319], 0.14, 0.07); },
+  gold()   { seq([523, 659, 784, 1047, 1319, 1568, 2093], 0.14, 0.055); },
+  spin()   { for (let i = 0; i < 6; i++) tone(500 + i * 90, null, 0.05, 'square', 0.07, i * 0.045); },
+  hammer() { tone(160, 60, 0.25, 'square', 0.16); tone(900, 300, 0.12, 'triangle', 0.1, 0.02); },
+  burnt()  { tone(210, 120, 0.16, 'square', 0.08); tone(150, 80, 0.24, 'triangle', 0.12, 0.08); },
+  splash() { tone(900, 200, 0.2, 'sine', 0.14); tone(500, 120, 0.25, 'triangle', 0.08, 0.05); },
+  ouch()   { tone(300, 70, 0.4, 'sawtooth', 0.11); tone(318, 74, 0.4, 'sawtooth', 0.06, 0.03); },
+  low()    { tone(220, 180, 0.18, 'triangle', 0.13); tone(220, 180, 0.18, 'triangle', 0.13, 0.25); },
+  combo()  { seq([784, 1047, 1319], 0.09, 0.05); },
+  start()  { seq([262, 330, 392, 523], 0.11, 0.07, 'triangle', 0.14); },
+  night()  { seq([392, 523, 659, 784, 659, 784, 1047], 0.16, 0.11, 'triangle', 0.14); },
+  win()    { seq([523, 523, 659, 784, 1047, 784, 1047, 1319, 1568], 0.2, 0.13, 'triangle', 0.15); },
+  over()   { seq([392, 330, 262, 196], 0.24, 0.18, 'triangle', 0.15); },
+};
+
+// ---------- helpers ----------
+function rand(a, b) { return a + Math.random() * (b - a); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function hex(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const rgb = a => `rgb(${a[0]},${a[1]},${a[2]})`;
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
+  c.lineTo(x + w, y + h - r); c.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+  c.lineTo(x + r, y + h); c.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+  c.lineTo(x, y + r); c.arc(x + r, y + r, r, Math.PI, Math.PI * 1.5);
+  c.closePath();
+}
+function ell(c, x, y, rx, ry, fill) { c.beginPath(); c.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, Math.PI * 2); c.fillStyle = fill; c.fill(); }
+function outlinedText(txt, x, y, size, fill, align) {
+  ctx.font = `700 ${size}px ${FONT}`;
+  ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = size * 0.2; ctx.strokeStyle = '#fff';
+  ctx.strokeText(txt, x, y); ctx.fillStyle = fill; ctx.fillText(txt, x, y);
+}
+const has = f => endless || night >= CONFIG.startsOnNight[f];
+const maxLives = () => easy ? CONFIG.easyLives : CONFIG.lives;
+const target = () => endless ? 8 : night;
+
+// ---------- layout ----------
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cvs.width = Math.round(W * dpr); cvs.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  groundTop = H - Math.max(46, H * 0.12);
+  baseR = clamp(Math.min(W, H) * 0.085, 30, 70);
+  itemSize = clamp(baseR * 1.05, 34, 66);
+  if (!m.x) { m.x = m.targetX = W / 2; }
+  m.r = baseR;
+  m.x = clamp(m.x, 0, W); m.targetX = clamp(m.targetX, 0, W);
+  if (!stars.length) for (let i = 0; i < 70; i++) stars.push({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), ph: rand(0, 6.28) });
+}
+window.addEventListener('resize', resize);
+// where the chanukiah sits: top middle on wide screens, under the buttons on phones
+function chanLayout() {
+  const w = clamp(W * 0.32, 116, 240);
+  return W >= 600 ? { cx: W / 2, top: 14, w } : { cx: W - 12 - w / 2, top: 74, w };
+}
+
+// ---------- drawing the falling things ----------
+// Draws one thing centred on (0,0). Used for the game and for the little pictures on the start screen.
+function drawThing(c, kind, e, s, t) {
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  if (kind === 'dreidel') {
+    c.fillStyle = '#8a5a2b'; c.fillRect(-s * 0.06, -s * 0.5, s * 0.12, s * 0.34);
+    c.beginPath();
+    c.moveTo(-s * 0.32, -s * 0.2); c.lineTo(s * 0.32, -s * 0.2); c.lineTo(s * 0.32, s * 0.14);
+    c.lineTo(0, s * 0.5); c.lineTo(-s * 0.32, s * 0.14); c.closePath();
+    c.fillStyle = '#3d8bff'; c.fill();
+    c.lineWidth = s * 0.06; c.strokeStyle = '#173a8a'; c.stroke();
+    c.fillStyle = '#fff'; c.font = `700 ${s * 0.36}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('ג', 0, 0);
+    return;
+  }
+  if (kind === 'arrow') {
+    c.strokeStyle = '#8a5a2b'; c.lineWidth = s * 0.09;
+    c.beginPath(); c.moveTo(0, -s * 0.5); c.lineTo(0, s * 0.3); c.stroke();
+    c.fillStyle = '#d9342b';
+    for (const d of [-1, 1]) {
+      c.beginPath(); c.moveTo(0, -s * 0.5); c.lineTo(d * s * 0.18, -s * 0.58); c.lineTo(d * s * 0.18, -s * 0.34); c.lineTo(0, -s * 0.26); c.closePath(); c.fill();
+    }
+    c.beginPath(); c.moveTo(0, s * 0.58); c.lineTo(-s * 0.18, s * 0.26); c.lineTo(s * 0.18, s * 0.26); c.closePath();
+    c.fillStyle = '#c9d2e0'; c.fill(); c.lineWidth = s * 0.04; c.strokeStyle = '#4a5568'; c.stroke();
+    return;
+  }
+  if (kind === 'burnt') {
+    for (let i = 0; i < 3; i++) {
+      const p = ((t * 0.6 + i / 3) % 1);
+      c.globalAlpha = 0.5 * (1 - p);
+      ell(c, Math.sin(t * 2 + i * 2) * s * 0.1 + (i - 1) * s * 0.16, -s * 0.25 - p * s * 0.4, s * (0.08 + p * 0.08), s * (0.08 + p * 0.08), '#cfcfd6');
+    }
+    c.globalAlpha = 1;
+    ell(c, 0, s * 0.08, s * 0.46, s * 0.3, '#2b1d14');
+    ell(c, 0, s * 0.04, s * 0.4, s * 0.24, '#47301f');
+    ell(c, -s * 0.15, 0, s * 0.09, s * 0.06, '#1c120c');
+    ell(c, s * 0.14, s * 0.08, s * 0.1, s * 0.06, '#1c120c');
+    ell(c, 0, -s * 0.06, s * 0.06, s * 0.04, '#1c120c');
+    return;
+  }
+  const big = kind === 'golden' || kind === 'finalJug';
+  c.font = `${s * (big ? 1.2 : 1)}px ${EMOJI_FONT}`;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(e, 0, 0);
+  if (kind === 'jar' || big) {
+    // the seal that shows the oil is pure
+    const sr = s * (big ? 0.15 : 0.11);
+    ell(c, 0, s * 0.06, sr * 1.35, sr * 1.35, '#ffd84a');
+    ell(c, 0, s * 0.06, sr, sr, '#d9342b');
+  }
+  if (kind === 'cracked') {
+    const zig = [[-0.04, -0.34], [0.1, -0.16], [-0.1, 0.0], [0.08, 0.16], [-0.04, 0.34]];
+    for (const [col, lw] of [['#fff', 0.14], ['#1c120c', 0.07]]) {
+      c.beginPath(); zig.forEach(([x, y], i) => i ? c.lineTo(x * s, y * s) : c.moveTo(x * s, y * s));
+      c.strokeStyle = col; c.lineWidth = s * lw; c.stroke();
+    }
+    ell(c, s * 0.2, s * 0.4, s * 0.07, s * 0.1, '#7fb53a');
+  }
+}
+const EMO = { jar: '🏺', cracked: '🏺', golden: '🏺', finalJug: '🏺', flame: '🔥', shamash: '🕯️', hammer: '🔨', water: '💧' };
+
+// little pictures for the start screen
+function legend(id, list) {
+  const el = document.getElementById(id);
+  for (const [kind, e] of list) {
+    const c = document.createElement('canvas'); c.width = c.height = 68;
+    const g = c.getContext('2d');
+    g.translate(34, 34);
+    drawThing(g, kind, e || EMO[kind], 50, 0.2);
+    el.appendChild(c);
+  }
+}
+legend('goodList', [['good', '🍩'], ['good', '🪙'], ['jar'], ['flame']]);
+legend('badList', [['burnt'], ['arrow'], ['water'], ['cracked']]);
+legend('specialList', [['dreidel'], ['hammer'], ['shamash'], ['golden']]);
+
+// ---------- screens ----------
+const $ = id => document.getElementById(id);
+const screens = ['startScreen', 'pauseScreen', 'nightScreen', 'winScreen', 'overScreen'].map($);
+const pauseBtn = $('pauseBtn');
+document.querySelectorAll('.hname').forEach(el => el.textContent = CONFIG.heroName);
+function show(screen) { screens.forEach(s => s.classList.toggle('hidden', s !== screen)); }
+
+function refreshStart() {
+  const next = Math.min(progress, 8);
+  $('playBtn').textContent = progress > 8 ? 'Play night 1' : progress > 1 ? `Play night ${next}` : 'Play!';
+  $('fromStartBtn').classList.toggle('hidden', !(progress > 1 && progress <= 8));
+  $('endlessBtn').classList.toggle('hidden', !(progress > 8 || CONFIG.unlockAll));
+  $('easyBtn').textContent = `Easy mode: ${easy ? 'on' : 'off'}`;
+}
+function goHome() {
+  state = 'start';
+  items = []; floaters = [];
+  pauseBtn.classList.add('hidden');
+  refreshStart();
+  show($('startScreen'));
+}
+function saveBest() {
+  const isRecord = score > best && score > 0;
+  if (isRecord) { best = score; save('mc.best', best); }
+  return isRecord;
+}
+
+function startNight(n, carryScore) {
+  initAudio();
+  night = n; endless = n > 8; wonGame = false;
+  score = carryScore || 0; nightStartScore = score;
+  lives = maxLives(); level = 0;
+  lit = 0; pendingFlames = 0; flamePts = 0; combo = 0;
+  items = []; particles = []; floaters = [];
+  spawnT = 1.4; spawned = 0;
+  oil = 1; oilWarned = false; overReason = 'arrow';
+  m.hurt = 0; m.happy = 0;
+  bannerT = 2.4;
+  bannerTitle = endless ? 'Endless night!' : `Night ${n}`;
+  bannerSub = endless ? 'How much gelt can you collect?' : NIGHTS[n - 1].news;
+  show(null);
+  pauseBtn.textContent = '⏸️'; pauseBtn.classList.remove('hidden');
+  state = 'playing';
+  sfx.start();
+}
+function showNightCard() {
+  state = 'card';
+  pauseBtn.classList.add('hidden');
+  progress = Math.max(progress, night + 1); save('mc.night', progress);
+  saveBest();
+  if (night >= 8) {
+    $('winStory').textContent = NIGHTS[7].story;
+    $('winScore').textContent = score;
+    $('winBest').innerHTML = score >= best ? '<span class="record">New record! 🎉</span>' : `Best so far: ${best}`;
+    show($('winScreen'));
+    return;
+  }
+  $('nightTitle').textContent = `Night ${night} is lit!`;
+  $('nightStory').textContent = NIGHTS[night - 1].story;
+  $('nightScore').textContent = score;
+  $('nextBtn').textContent = `Night ${night + 1} ➜`;
+  show($('nightScreen'));
+}
+function showGameOver() {
+  state = 'over';
+  pauseBtn.classList.add('hidden');
+  const isRecord = saveBest();
+  $('finalScore').textContent = score;
+  $('overTitle').textContent = overReason === 'oil' ? 'The oil ran out!' : 'Oh no!';
+  $('overReason').textContent = overReason === 'oil'
+    ? `Catch more to keep ${CONFIG.heroName}'s oil topped up!`
+    : `Too many arrows got ${CONFIG.heroName}!`;
+  $('bestLine').innerHTML = isRecord ? '<span class="record">New record! 🎉</span>' : `Best so far: ${best}`;
+  $('againBtn').textContent = endless ? 'Play again!' : `Try night ${night} again!`;
+  show($('overScreen'));
+  sfx.over();
+}
+$('playBtn').addEventListener('click', () => startNight(progress > 8 ? 1 : progress, 0));
+$('fromStartBtn').addEventListener('click', () => startNight(1, 0));
+$('endlessBtn').addEventListener('click', () => startNight(9, 0));
+$('easyBtn').addEventListener('click', () => { easy = !easy; save('mc.easy', easy); refreshStart(); });
+$('nextBtn').addEventListener('click', () => startNight(night + 1, score));
+$('winEndlessBtn').addEventListener('click', () => startNight(9, 0));
+$('winAgainBtn').addEventListener('click', () => startNight(1, 0));
+$('againBtn').addEventListener('click', () => startNight(night, endless ? 0 : nightStartScore));
+$('overHomeBtn').addEventListener('click', goHome);
+refreshStart();
+
+// ---------- pause ----------
+function pauseGame() {
+  if (state !== 'playing' && state !== 'finale') return;
+  resumeState = state;
+  state = 'paused';
+  pointerDown = false;
+  for (const k in keys) delete keys[k];
+  show($('pauseScreen'));
+  pauseBtn.textContent = '▶️';
+}
+function resumeGame() {
+  if (state !== 'paused') return;
+  state = resumeState;
+  last = performance.now();
+  show(null);
+  pauseBtn.textContent = '⏸️';
+}
+pauseBtn.addEventListener('click', () => { state === 'paused' ? resumeGame() : pauseGame(); });
+$('resumeBtn').addEventListener('click', resumeGame);
+$('quitBtn').addEventListener('click', goHome);
+
+const muteBtn = $('mute');
+function showMute() { muteBtn.textContent = muted ? '🔇' : '🔊'; }
+muteBtn.addEventListener('click', () => { muted = !muted; save('mc.muted', muted); showMute(); initAudio(); });
+showMute();
+
+// ---------- controls ----------
+function setTarget(x) { if (state !== 'paused') m.targetX = x; }
+cvs.addEventListener('pointerdown', e => { if (state === 'paused') return; pointerDown = true; setTarget(e.clientX); initAudio(); });
+window.addEventListener('pointermove', e => {
+  pointerX = e.clientX; pointerY = e.clientY;
+  if (e.pointerType === 'mouse' || pointerDown) setTarget(e.clientX);
+});
+window.addEventListener('pointerup', () => { pointerDown = false; });
+window.addEventListener('pointercancel', () => { pointerDown = false; });
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'p' || e.key === 'Escape') { e.preventDefault(); state === 'paused' ? resumeGame() : pauseGame(); return; }
+  const go = e.key === 'Enter' || e.key === ' ';
+  if (state === 'paused') { if (go) { e.preventDefault(); resumeGame(); } return; }
+  if (['arrowleft', 'arrowright', 'a', 'd'].includes(k)) { keys[k] = true; e.preventDefault(); }
+  if (go && e.target.tagName !== 'BUTTON') {
+    const btn = state === 'start' ? 'playBtn' : state === 'over' ? 'againBtn' : state === 'card' ? (night >= 8 ? 'winEndlessBtn' : 'nextBtn') : null;
+    if (btn) { e.preventDefault(); $(btn).click(); }
+  }
+});
+window.addEventListener('keyup', e => { delete keys[e.key.toLowerCase()]; });
+
+// ---------- game logic ----------
+function makeItem(kind) {
+  const pad = itemSize * 0.8;
+  const x = rand(pad, W - pad);
+  // from the windy night on, things drift sideways; on the last night some of them zig-zag
+  const windy = has('wind') && kind !== 'finalJug';
+  const drift = windy ? W * rand(0.06, 0.18) * (Math.random() < 0.5 ? -1 : 1) : 0;
+  const wob = (night >= 8 && kind !== 'finalJug' && kind !== 'arrow' && Math.random() < 0.4) ? itemSize * rand(0.5, 1.2) : 0;
+  const straight = kind === 'arrow' || kind === 'flame' || kind === 'shamash' || kind === 'finalJug';
+  return {
+    x, bx: x, y: -itemSize,
+    e: EMO[kind] || pick(CONFIG.goodies),
+    kind, bad: BAD_KINDS.includes(kind),
+    rot: straight ? 0 : rand(-0.3, 0.3), spin: straight ? 0 : kind === 'dreidel' ? rand(3, 5) * (Math.random() < 0.5 ? -1 : 1) : rand(-1.6, 1.6),
+    v: kind === 'arrow' ? 1.75 : kind === 'golden' ? 1.3 : kind === 'flame' ? 0.85 : kind === 'finalJug' ? 0.55 : rand(0.9, 1.12),
+    vx: kind === 'arrow' ? drift * 0.3 : drift, wob, ph: rand(0, Math.PI * 2),
+  };
+}
+function spawnItem() {
+  let kind = 'good';
+  if (!endless && pendingFlames > 0 && !items.some(i => i.kind === 'flame')) kind = 'flame';
+  else if (spawned >= 3) {
+    // the first few are always good, so each night starts gently
+    const harder = 1 + (endless ? 7 + level : night - 1) * 0.08;
+    const table = [];
+    for (const k of ['golden', 'shamash', 'hammer', 'dreidel']) {
+      if (!has(k)) continue;
+      if (k === 'shamash' && (endless || lit + pendingFlames >= target())) continue;
+      table.push([k, CONFIG.chance[k]]);
+    }
+    for (const k of BAD_KINDS) if (has(k)) table.push([k, Math.min(0.25, CONFIG.chance[k] * harder)]);
+    let r = Math.random();
+    for (const [k, p] of table) { if (r < p) { kind = k; break; } r -= p; }
+    if (kind === 'good' && Math.random() < 0.22) kind = 'jar';
+  }
+  items.push(makeItem(kind));
+  spawned++;
+}
+function burst(x, y, colours, n, power) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), s = rand(80, 260) * (power || 1);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 120, life: 1, c: pick(colours), size: rand(3, 7) });
+  }
+}
+function floatText(txt, colour, big) { floaters.push({ txt, x: clamp(m.x, 70, W - 70), y: groundTop - m.r * 3.4, c: colour, life: 1, big: !!big }); }
+
+function addPoints(n) {
+  score = Math.max(0, score + n);
+  if (n <= 0) return;
+  if (endless) { level = Math.floor(score / 15); return; }
+  if (state !== 'playing') return;
+  flamePts += n;
+  while (flamePts >= CONFIG.flameEvery && lit + pendingFlames < target()) { flamePts -= CONFIG.flameEvery; pendingFlames++; }
+}
+function goodCatch() {
+  m.happy = 1; combo++;
+  if (combo % CONFIG.comboEvery === 0) {
+    addPoints(CONFIG.comboBonus);
+    floaters.push({ txt: `${combo} in a row! +${CONFIG.comboBonus}`, x: clamp(m.x, 90, W - 90), y: groundTop - m.r * 4.1, c: '#e0247a', life: 1.2 });
+    sfx.combo();
+  }
+}
+function badCatch(strength) { m.hurt = strength; combo = 0; }
+function lightCandle() {
+  if (endless || lit >= target()) return;
+  lit++;
+  pendingFlames = Math.min(pendingFlames, target() - lit);
+  const ch = chanLayout();
+  burst(ch.cx, ch.top + ch.w * 0.2, ['#ffd84a', '#ffb800', '#fff4b0', '#ff7a29'], 26);
+  sfx.light();
+  if (lit >= target()) {
+    pendingFlames = 0;
+    if (night >= 8) {
+      // last night: clear the sky and send down the golden jug
+      for (const it of items) burst(it.x, it.y, ['#ffd84a', '#fff4b0', '#ffffff'], 6);
+      items = []; state = 'finale'; spawnT = 1.2;
+      bannerT = 2.2; bannerTitle = 'All eight!'; bannerSub = 'Now catch the golden jug!';
+    } else { state = 'nightwon'; endT = 2; fireT = 0; setTimeout(() => sfx.night(), 250); }
+  }
+}
+
+function catchItem(it) {
+  const k = it.kind;
+  if (k === 'good' || k === 'jar') {
+    const pts = k === 'jar' ? CONFIG.jarPoints : 1;
+    addPoints(pts); oil = Math.min(1, oil + (k === 'jar' ? 0.3 : 0.1));
+    k === 'jar' ? sfx.jar() : sfx.catch();
+    burst(it.x, it.y, ['#ffcf40', '#ff7aa8', '#7ad3ff', '#9be07a', '#ffffff'], 12);
+    floatText(k === 'jar' ? `+${pts} Pure oil!` : pick(['Yum!', 'Got it!', 'Tasty!', 'Nice catch!', 'Mmm!']), '#ff7a29');
+    goodCatch();
+  } else if (k === 'flame' || k === 'shamash') {
+    if (k === 'flame') pendingFlames = Math.max(0, pendingFlames - 1); else addPoints(3);
+    oil = Math.min(1, oil + 0.2);
+    burst(it.x, it.y, ['#ffd84a', '#ff7a29', '#fff4b0'], 20);
+    floatText(k === 'flame' ? 'Candle lit!' : 'Shamash! Candle lit!', '#e09a00', true);
+    goodCatch();
+    lightCandle();
+  } else if (k === 'golden' || k === 'finalJug') {
+    addPoints(CONFIG.goldenPoints * (k === 'finalJug' ? 2 : 1)); oil = 1; lives = Math.min(maxLives(), lives + 1);
+    sfx.gold();
+    burst(it.x, it.y, ['#ffd84a', '#ffb800', '#fff4b0', '#ffffff'], 40, 1.4);
+    floatText(k === 'finalJug' ? 'You found the oil!' : `+${CONFIG.goldenPoints} Golden jug!`, '#e09a00', true);
+    goodCatch();
+    if (k === 'finalJug') { wonGame = true; state = 'nightwon'; endT = 3; fireT = 0; setTimeout(() => sfx.win(), 500); }
+  } else if (k === 'hammer') {
+    let n = 0;
+    items = items.filter(o => { if (!o.bad) return true; n++; burst(o.x, o.y, ['#c9d2e0', '#ffcf40', '#ffffff'], 10); return false; });
+    addPoints(n);
+    sfx.hammer();
+    burst(it.x, it.y, ['#c9d2e0', '#ffcf40', '#ffffff'], 16);
+    floatText(n ? `Smash! +${n}` : 'Smash!', '#5b6b8a', true);
+    goodCatch();
+  } else if (k === 'dreidel') {
+    const side = pick(Object.keys(CONFIG.dreidel));
+    const pts = CONFIG.dreidel[side], name = side[0].toUpperCase() + side.slice(1);
+    addPoints(pts);
+    sfx.spin();
+    burst(it.x, it.y, ['#3d8bff', '#ffcf40', '#ffffff'], 16);
+    if (pts > 0) { setTimeout(() => (pts >= 10 ? sfx.gold() : sfx.jar()), 280); goodCatch(); }
+    else if (pts < 0) { setTimeout(() => sfx.burnt(), 280); combo = 0; }
+    floatText(`${DREIDEL_LETTERS[side]} ${name}! ${pts > 0 ? '+' + pts : pts < 0 ? pts : 'Nothing'}`, pts > 0 ? '#1f7fd6' : '#6b6b80', true);
+  } else if (k === 'burnt') {
+    addPoints(-CONFIG.burntPenalty);
+    sfx.burnt(); badCatch(0.6);
+    burst(it.x, it.y, ['#2b1d14', '#47301f', '#8a8a92'], 14);
+    floatText(`-${CONFIG.burntPenalty} Burnt!`, '#6b4a2f');
+  } else if (k === 'cracked') {
+    addPoints(-CONFIG.crackedPenalty); oil = Math.max(0.05, oil - 0.2);
+    sfx.burnt(); badCatch(0.6);
+    burst(it.x, it.y, ['#b5733a', '#7fb53a', '#d9a066'], 16);
+    floatText(`-${CONFIG.crackedPenalty} Cracked jar!`, '#8a5a2b');
+  } else if (k === 'water') {
+    sfx.splash(); badCatch(0.5);
+    burst(it.x, it.y, ['#7ad3ff', '#cfe9ff', '#3d8bff'], 18);
+    if (!endless && lit > 0) {
+      lit--; pendingFlames++;      // the flame comes straight back so you can relight it
+      const ch = chanLayout(); burst(ch.cx, ch.top + ch.w * 0.2, ['#7ad3ff', '#cfe9ff', '#8a8a92'], 14);
+      floatText('Splash! A candle went out!', '#1f7fd6');
+    } else { addPoints(-2); floatText('-2 Splash!', '#1f7fd6'); }
+  } else if (k === 'arrow') {
+    lives--;
+    sfx.ouch(); badCatch(1);
+    burst(it.x, it.y, ['#d9342b', '#c9d2e0', '#8a5a2b'], 14);
+    floatText(pick(['Ouch!', 'Oof!', 'Yikes!']), '#d9342b');
+    if (lives <= 0) { overReason = 'arrow'; state = 'ending'; endT = 1.1; }
+  }
+}
+
+function update(dt) {
+  time += dt;
+  const active = state === 'playing' || state === 'finale';
+
+  // hero movement
+  const kd = (keys['arrowright'] || keys['d'] ? 1 : 0) - (keys['arrowleft'] || keys['a'] ? 1 : 0);
+  if (kd) m.targetX += kd * W * 0.85 * dt;
+  m.targetX = clamp(m.targetX, m.r, W - m.r);
+  m.x += (m.targetX - m.x) * Math.min(1, dt * 14);
+
+  // face
+  m.blinkT -= dt;
+  if (m.blinkT <= 0) { m.blink = 1; m.blinkT = rand(2, 4.5); }
+  m.blink = Math.max(0, m.blink - dt * 7);
+  m.happy = Math.max(0, m.happy - dt * 3.2);
+  m.hurt = Math.max(0, m.hurt - dt * (state === 'ending' ? 0.4 : 1.2));
+  bannerT = Math.max(0, bannerT - dt);
+
+  const n = endless ? 8 : night;
+  if (state === 'playing') {
+    spawnT -= dt;
+    if (spawnT <= 0) { spawnItem(); spawnT = Math.max(0.3, 0.9 - (n - 1) * 0.08 - level * 0.03) * rand(0.8, 1.2); }
+    // the oil runs down over time, a little faster each night
+    if (CONFIG.oilDrains) {
+      oil -= (0.05 + (n - 1) * 0.007 + level * 0.004) * (easy ? CONFIG.easyDrain : 1) * dt;
+      if (oil < 0.3 && !oilWarned) { oilWarned = true; sfx.low(); floatText('Oil is low!', '#e0247a'); }
+      if (oil > 0.45) oilWarned = false;
+      if (oil <= 0) { oil = 0; overReason = 'oil'; state = 'ending'; endT = 1.1; sfx.low(); }
+    }
+  }
+  if (state === 'finale') {
+    if (!items.some(i => i.kind === 'finalJug')) { spawnT -= dt; if (spawnT <= 0) { items.push(makeItem('finalJug')); spawnT = 0.8; } }
+  }
+  if (state === 'ending') { endT -= dt; if (endT <= 0) showGameOver(); }
+  if (state === 'nightwon') {
+    endT -= dt; fireT -= dt; m.happy = Math.max(m.happy, 0.5 + Math.sin(time * 9) * 0.5);
+    if (fireT <= 0) {
+      fireT = wonGame ? 0.16 : 0.3;
+      burst(rand(W * 0.1, W * 0.9), rand(H * 0.12, H * 0.55), pick([['#ffd84a', '#fff4b0'], ['#7ad3ff', '#ffffff'], ['#ff7aa8', '#ffd84a'], ['#9be07a', '#ffffff']]), 22, 1.2);
+    }
+    if (endT <= 0) showNightCard();
+  }
+
+  const speed = H * Math.min(0.85, CONFIG.startSpeed + (n - 1) * CONFIG.speedPerNight + level * 0.035) * (easy ? CONFIG.easySpeed : 1);
+  const edge = itemSize * 0.6;
+  const catchY = groundTop - m.r * 2.8;
+  let nearest = null, nearestD = Infinity;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    it.y += speed * it.v * dt;
+    it.rot += it.spin * dt;
+    if (it.vx) {
+      it.bx += it.vx * dt;
+      if (it.bx < edge) { it.bx = edge; it.vx = Math.abs(it.vx); }
+      else if (it.bx > W - edge) { it.bx = W - edge; it.vx = -Math.abs(it.vx); }
+    }
+    it.x = clamp(it.bx + (it.wob ? Math.sin(time * 3 + it.ph) * it.wob : 0), edge, W - edge);
+    if (active
+        && Math.abs(it.x - m.x) < m.r * 0.9 + itemSize * 0.25
+        && it.y + itemSize * 0.35 > catchY - m.r * 0.35
+        && it.y - itemSize * 0.35 < catchY + m.r * 0.45) {
+      items.splice(items.indexOf(it), 1); catchItem(it);
+      i = Math.min(i, items.length); continue;
+    }
+    if (it.y > H + itemSize) { items.splice(i, 1); continue; }
+    const d = Math.hypot(it.x - m.x, it.y - catchY);
+    if (it.y < catchY && d < nearestD) { nearestD = d; nearest = it; }
+  }
+
+  // eyes follow the nearest thing (or your finger)
+  let tx = 0, ty = 0;
+  const eyeY = groundTop - m.r * 1.7;
+  if (nearest) { const dx = nearest.x - m.x, dy = nearest.y - eyeY, l = Math.hypot(dx, dy) || 1; tx = dx / l; ty = dy / l; }
+  else if (pointerX !== null) { const dx = pointerX - m.x, dy = pointerY - eyeY, l = Math.hypot(dx, dy) || 1; tx = dx / l; ty = dy / l; }
+  else { tx = Math.sin(time * 0.7) * 0.6; ty = -0.4; }
+  m.lookX += (tx - m.lookX) * Math.min(1, dt * 10);
+  m.lookY += (ty - m.lookY) * Math.min(1, dt * 10);
+
+  // mouth opens when something is close above
+  const close = nearest && Math.abs(nearest.x - m.x) < m.r * 1.6 && catchY - nearest.y < m.r * 3.2;
+  m.mouth += (((active && close) ? 1 : 0) - m.mouth) * Math.min(1, dt * 12);
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.4;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i]; f.y -= 60 * dt; f.life -= dt * 1.1;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
+}
+
+// ---------- drawing ----------
+function drawBackground() {
+  const pal = SKIES[(endless ? 7 : night - 1) % SKIES.length];
+  const sky = ctx.createLinearGradient(0, 0, 0, groundTop);
+  sky.addColorStop(0, pal[0]); sky.addColorStop(1, pal[1]);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, groundTop + 2);
+
+  for (const s of stars) {
+    ctx.globalAlpha = 0.45 + Math.sin(time * 2 + s.ph) * 0.35;
+    ell(ctx, s.x * W, s.y * groundTop * 0.8, s.s, s.s, '#fff');
+  }
+  ctx.globalAlpha = 1;
+
+  // moon
+  const mx = W * 0.14, my = H * 0.3, mr = Math.min(W, H) * 0.055;
+  const glow = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 2.6);
+  glow.addColorStop(0, 'rgba(255,244,190,0.5)'); glow.addColorStop(1, 'rgba(255,244,190,0)');
+  ctx.fillStyle = glow; ctx.fillRect(mx - mr * 3, my - mr * 3, mr * 6, mr * 6);
+  ell(ctx, mx, my, mr, mr, '#fff4be');
+  ell(ctx, mx + mr * 0.4, my - mr * 0.25, mr * 0.85, mr * 0.85, pal[0]);
+
+  // hills and the walls of the city
+  ell(ctx, W * 0.2, groundTop + 6, W * 0.5, H * 0.16, '#2c2466');
+  ell(ctx, W * 0.85, groundTop + 6, W * 0.42, H * 0.12, '#342a72');
+  const u = clamp(W / 26, 14, 34), wallTop = groundTop - u * 2.2;
+  ctx.fillStyle = '#463a86';
+  ctx.fillRect(0, wallTop, W, groundTop - wallTop);
+  for (let x = 0; x < W; x += u * 1.6) ctx.fillRect(x, wallTop - u * 0.5, u * 0.9, u * 0.5);
+  for (const [fx, tw, th] of [[0.3, 2.2, 3.6], [0.72, 2.6, 4.4]]) {
+    const tx = W * fx, x0 = tx - tw * u / 2, y0 = groundTop - th * u;
+    ctx.fillStyle = '#4f4292'; ctx.fillRect(x0, y0, tw * u, th * u);
+    ctx.beginPath(); ctx.arc(tx, y0, tw * u / 2, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = `rgba(255,214,110,${0.75 + Math.sin(time * 3 + fx * 9) * 0.15})`;
+    roundRect(ctx, tx - u * 0.3, y0 + u * 0.6, u * 0.6, u * 0.95, u * 0.3); ctx.fill();
+  }
+
+  ctx.fillStyle = '#7a6248'; ctx.fillRect(0, groundTop, W, H - groundTop);
+  ctx.fillStyle = '#93795a'; ctx.fillRect(0, groundTop, W, 6);
+}
+
+// The chanukiah. Candles go in from the right, and the newest one is lit first.
+function drawChanukiah(cx, top, w, placed, litN) {
+  const h = w * 0.55, step = w / 9.4, armY = top + h * 0.5, baseY = top + h;
+  const gold = '#f2c14e', goldDark = '#b9861f';
+  ctx.save();
+  roundRect(ctx, cx - w / 2 - 6, top - 6, w + 12, h + 12, 14);
+  ctx.fillStyle = 'rgba(16,12,48,0.45)'; ctx.fill();
+  ctx.lineCap = 'round'; ctx.strokeStyle = gold; ctx.lineWidth = Math.max(2.5, w * 0.022);
+  for (let k = 1; k <= 4; k++) { ctx.beginPath(); ctx.ellipse(cx, armY, k * step, k * h * 0.095, 0, 0, Math.PI); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(cx, armY - h * 0.1); ctx.lineTo(cx, baseY - h * 0.08); ctx.stroke();
+  ctx.fillStyle = gold;
+  ctx.beginPath(); ctx.moveTo(cx - step * 1.7, baseY); ctx.lineTo(cx + step * 1.7, baseY); ctx.lineTo(cx + step * 0.8, baseY - h * 0.1); ctx.lineTo(cx - step * 0.8, baseY - h * 0.1); ctx.closePath(); ctx.fill();
+  const fromRight = [8, 7, 6, 5, 3, 2, 1, 0];
+  const colours = ['#7ad3ff', '#ff7aa8', '#9be07a', '#ffcf40', '#c9a2ff', '#ff9a5c', '#7ad3ff', '#ff7aa8'];
+  const cw = step * 0.34, chh = h * 0.2;
+  for (let slot = 0; slot < 9; slot++) {
+    const x = cx + (slot - 4) * step, sham = slot === 4, cupY = armY - (sham ? h * 0.12 : 0);
+    ctx.fillStyle = goldDark; ctx.fillRect(x - cw * 0.9, cupY - 2, cw * 1.8, 4);
+    const idx = fromRight.indexOf(slot);
+    const here = sham || idx < placed;
+    if (!here) continue;
+    ctx.fillStyle = sham ? '#ffffff' : colours[idx];
+    ctx.fillRect(x - cw / 2, cupY - 2 - chh, cw, chh);
+    const isLit = sham || idx >= placed - litN;
+    if (isLit) {
+      const fl = 1 + Math.sin(time * 11 + slot * 1.7) * 0.14, fy = cupY - 2 - chh, fr = step * 0.2;
+      ctx.beginPath(); ctx.moveTo(x, fy - fr * 2.6 * fl);
+      ctx.quadraticCurveTo(x + fr * 1.3, fy - fr * 0.9, x, fy); ctx.quadraticCurveTo(x - fr * 1.3, fy - fr * 0.9, x, fy - fr * 2.6 * fl);
+      ctx.fillStyle = '#ff9a2e'; ctx.fill();
+      ell(ctx, x, fy - fr * 0.75, fr * 0.45, fr * 0.75, '#fff4b0');
+    }
+  }
+  ctx.restore();
+}
+
+function drawHero() {
+  const r = m.r;
+  const hop = Math.sin(m.happy * Math.PI) * r * 0.18;
+  const shake = m.hurt > 0.05 ? Math.sin(time * 55) * r * 0.07 * m.hurt : 0;
+  const hurting = m.hurt > 0.35;
+  const tunicArr = hex(CONFIG.tunicColour);
+  const tunic = rgb(tunicArr), dark = '#2a1c4a', skin = '#f0b98a', bronze = '#d99a2b';
+  const lw = Math.max(2, r * 0.06);
+
+  ctx.save(); ctx.globalAlpha = 0.25;
+  ell(ctx, m.x, groundTop + r * 0.04, r * (0.8 - hop / r * 0.8), r * 0.12, '#000');
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(m.x + shake, groundTop - hop);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = lw; ctx.strokeStyle = dark;
+
+  // legs and sandals
+  for (const s of [-1, 1]) {
+    ctx.fillStyle = skin; ctx.fillRect(s * r * 0.26 - r * 0.1, -r * 0.5, r * 0.2, r * 0.42);
+    ell(ctx, s * r * 0.3, -r * 0.07, r * 0.24, r * 0.11, '#7a4a21');
+  }
+  // arms holding the shield up
+  for (const s of [-1, 1]) {
+    for (const [col, wdt] of [[dark, r * 0.3], [skin, r * 0.2]]) {
+      ctx.beginPath(); ctx.moveTo(s * r * 0.48, -r * 1.12); ctx.lineTo(s * r * 0.74, -r * 2.62);
+      ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = dark; ctx.lineWidth = lw;
+  // tunic and belt
+  roundRect(ctx, -r * 0.56, -r * 1.32, r * 1.12, r * 0.96, r * 0.26);
+  ctx.fillStyle = tunic; ctx.fill(); ctx.stroke();
+  ctx.fillStyle = rgb(mix(tunicArr, [255, 255, 255], 0.75)); ctx.fillRect(-r * 0.56 + lw / 2, -r * 0.56, r * 1.12 - lw, r * 0.1);
+  ctx.fillStyle = bronze; ctx.fillRect(-r * 0.56 + lw / 2, -r * 0.92, r * 1.12 - lw, r * 0.13);
+  ell(ctx, 0, -r * 0.855, r * 0.1, r * 0.1, '#fff1c1');
+
+  // head
+  const hy = -r * 1.76, hr = r * 0.5;
+  ctx.beginPath(); ctx.arc(0, hy, hr, 0, Math.PI * 2); ctx.fillStyle = skin; ctx.fill(); ctx.stroke();
+  // helmet with a crest
+  ell(ctx, 0, hy - hr * 1.02, r * 0.3, r * 0.13, '#d9342b');
+  ctx.beginPath(); ctx.arc(0, hy, hr * 1.08, Math.PI * 1.04, -Math.PI * 0.04);
+  ctx.lineTo(hr * 1.08, hy + hr * 0.02); ctx.lineTo(-hr * 1.08, hy + hr * 0.02); ctx.closePath();
+  ctx.fillStyle = bronze; ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff1c1'; ctx.fillRect(-hr * 1.0, hy - hr * 0.2, hr * 2.0, hr * 0.12);
+  // cheeks
+  for (const s of [-1, 1]) ell(ctx, s * hr * 0.62, hy + hr * 0.42, hr * 0.17, hr * 0.11, 'rgba(255,110,120,0.45)');
+
+  // eyes
+  const ey = hy + hr * 0.26, er = hr * 0.2;
+  for (const s of [-1, 1]) {
+    const ex = s * hr * 0.4;
+    if (hurting) {
+      ctx.beginPath(); ctx.lineWidth = r * 0.06; ctx.strokeStyle = dark;
+      ctx.moveTo(ex + s * er * 0.6, ey - er * 0.6); ctx.lineTo(ex - s * er * 0.6, ey); ctx.lineTo(ex + s * er * 0.6, ey + er * 0.6);
+      ctx.stroke();
+    } else {
+      const open = 1 - m.blink;
+      ell(ctx, ex, ey, er, er * Math.max(0.1, open), '#fff');
+      if (open > 0.3) ell(ctx, ex + m.lookX * er * 0.4, ey + m.lookY * er * 0.4 * open, er * 0.55, er * 0.55 * open, dark);
+    }
+  }
+  // mouth
+  const my = hy + hr * 0.66;
+  ctx.lineWidth = Math.max(1.5, r * 0.045); ctx.strokeStyle = '#5a1f2a';
+  if (hurting) {
+    ctx.beginPath(); ctx.moveTo(-hr * 0.3, my);
+    for (let i = 1; i <= 4; i++) ctx.quadraticCurveTo(-hr * 0.3 + (i - 0.5) * hr * 0.15, my + (i % 2 ? -hr * 0.1 : hr * 0.1), -hr * 0.3 + i * hr * 0.15, my);
+    ctx.stroke();
+  } else if (m.mouth > 0.2) {
+    ell(ctx, 0, my, hr * 0.2, hr * 0.08 + hr * 0.14 * m.mouth, '#5a1f2a');
+  } else if (CONFIG.oilDrains && oil < 0.3 && state === 'playing') {
+    ctx.beginPath(); ctx.arc(0, my + hr * 0.25, hr * 0.28, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(0, my - hr * 0.2, hr * 0.34, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke();
+  }
+
+  // the shield, held flat like a tray
+  const sy = -r * 2.8;
+  ctx.lineWidth = lw; ctx.strokeStyle = dark;
+  ctx.beginPath(); ctx.ellipse(0, sy, r * 0.98, r * 0.27, 0, 0, Math.PI * 2); ctx.fillStyle = '#f2c14e'; ctx.fill(); ctx.stroke();
+  ell(ctx, 0, sy - r * 0.02, r * 0.72, r * 0.17, bronze);
+  ell(ctx, 0, sy - r * 0.03, r * 0.22, r * 0.06, '#fff1c1');
+  ctx.restore();
+}
+
+function drawItems() {
+  for (const it of items) {
+    const k = it.kind;
+    if (k === 'flame' || k === 'shamash' || k === 'golden' || k === 'finalJug' || k === 'hammer') {
+      const c = k === 'hammer' ? '200,215,255' : '255,220,80';
+      const rad = itemSize * (k === 'finalJug' ? 1.7 : 1.15);
+      const g = ctx.createRadialGradient(it.x, it.y, 0, it.x, it.y, rad);
+      g.addColorStop(0, `rgba(${c},${0.6 + Math.sin(time * 10) * 0.25})`);
+      g.addColorStop(1, `rgba(${c},0)`);
+      ctx.fillStyle = g; ctx.fillRect(it.x - rad, it.y - rad, rad * 2, rad * 2);
+    }
+    ctx.save(); ctx.translate(it.x, it.y);
+    if (k === 'dreidel') ctx.scale(Math.cos(it.rot) * 0.35 + 0.75, 1); else ctx.rotate(it.rot);
+    drawThing(ctx, k, it.e, itemSize, time + it.ph);
+    ctx.restore();
+  }
+}
+
+function drawEffects() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ell(ctx, p.x, p.y, p.size, p.size, p.c);
+  }
+  ctx.globalAlpha = 1;
+  const fs = clamp(m.r * 0.6, 20, 36);
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, f.life * 1.6));
+    outlinedText(f.txt, f.x, f.y, f.big ? fs * 1.2 : fs, f.c);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  const ch = chanLayout();
+  if (state === 'start') { drawChanukiah(ch.cx, ch.top, ch.w, 8, Math.min(8, progress - 1)); return; }
+  drawChanukiah(ch.cx, ch.top, ch.w, target(), endless ? 8 : lit);
+
+  const fs = clamp(W * 0.06, 26, 40);
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = `${fs}px ${EMOJI_FONT}`;
+  ctx.fillText('🪙', 14, 16 + fs / 2);
+  const ew = ctx.measureText('🪙').width;
+  outlinedText(String(score), 14 + ew + 8, 16 + fs / 2, fs, '#2a1c4a', 'left');
+
+  const hs = fs * 0.66;
+  ctx.font = `${hs}px ${EMOJI_FONT}`; ctx.textAlign = 'left';
+  let hearts = '';
+  for (let i = 0; i < maxLives(); i++) hearts += i < lives ? '❤️' : '🤍';
+  ctx.fillText(hearts, 14, 16 + fs + 8 + hs / 2);
+
+  // oil meter
+  let y = 16 + fs + 8 + hs + 10;
+  const ts = clamp(fs * 0.5, 15, 20);
+  if (CONFIG.oilDrains) {
+    outlinedText('Oil', 14, y + ts / 2, ts, '#2a1c4a', 'left');
+    const bx = 14 + ctx.measureText('Oil').width + 8, bw = clamp(W * 0.28, 90, 190), bh = ts;
+    roundRect(ctx, bx, y, bw, bh, bh / 2); ctx.fillStyle = '#fff'; ctx.fill();
+    if (oil > 0.01) {
+      ctx.save(); roundRect(ctx, bx, y, bw, bh, bh / 2); ctx.clip();
+      ctx.fillStyle = oil > 0.5 ? '#f2b21e' : oil > 0.3 ? '#ff8a2e' : '#ff4d4d';
+      if (oil < 0.3) ctx.globalAlpha = 0.6 + Math.sin(time * 12) * 0.4;
+      ctx.fillRect(bx, y, bw * oil, bh);
+      ctx.restore();
+    }
+    roundRect(ctx, bx, y, bw, bh, bh / 2); ctx.lineWidth = 3; ctx.strokeStyle = '#2a1c4a'; ctx.stroke();
+    y += bh + 10;
+  }
+  outlinedText(endless ? 'Endless night' : `Night ${night} of 8`, 14, y + ts / 2, ts, '#2a1c4a', 'left');
+
+  if (bannerT > 0 && state !== 'card' && state !== 'over') {
+    const t = 2.4 - bannerT;
+    const pop = t < 0.25 ? 0.4 + (t / 0.25) * 0.75 : 1.15 - Math.min(0.15, (t - 0.25) * 0.6);
+    ctx.save(); ctx.globalAlpha = Math.min(1, bannerT * 2.5);
+    ctx.translate(W / 2, H * 0.4); ctx.scale(pop, pop);
+    const big = clamp(W * 0.13, 44, 100), small = clamp(W * 0.048, 17, 32);
+    outlinedText(bannerTitle, 0, 0, big, '#ffb02e');
+    outlinedText(bannerSub, 0, big * 0.78, small, '#2a1c4a');
+    ctx.restore();
+  }
+}
+
+function draw() {
+  drawBackground();
+  drawItems();
+  drawHero();
+  drawEffects();
+  drawHUD();
+}
+
+// ---------- main loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (state !== 'paused') update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); last = performance.now(); });
+
+resize();
+requestAnimationFrame(frame);
+
+// install as an app + play offline (only works on the real website, not in previews)
+try {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+} catch (e) {}
+</script>
+</body>
+</html>
